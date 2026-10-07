@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Cờ Caro Online 15x15</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-color: #f8fafc;
+            --primary-color: #3b82f6;
+            --hover-color: #2563eb;
+            --cell-bg: #ffffff;
+            --grid-line: #cbd5e1;
+        }
+
+        body.theme-cyberpunk {
+            --bg-color: #050505;
+            --panel-bg: #121212;
+            --text-color: #00ffcc;
+            --primary-color: #ff007f;
+            --hover-color: #cc0066;
+            --cell-bg: #1a1a1a;
+            --grid-line: #333;
+        }
+
+        body.theme-wood {
+            --bg-color: #3e2723;
+            --panel-bg: #4e342e;
+            --text-color: #efebe9;
+            --primary-color: #8d6e63;
+            --hover-color: #6d4c41;
+            --cell-bg: #d7ccc8;
+            --grid-line: #a1887f;
+        }
+
+        body.theme-neon {
+            --bg-color: #1a0033;
+            --panel-bg: #2b0054;
+            --text-color: #ff99ff;
+            --primary-color: #9933ff;
+            --hover-color: #7a00cc;
+            --cell-bg: #3d0066;
+            --grid-line: #6600cc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 520px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            box-sizing: border-box;
+            background: #334155;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--hover-color);
+        }
+
+        .hidden { display: none !important; }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            gap: 1px;
+            background-color: var(--grid-line);
+            border: 2px solid var(--grid-line);
+            margin: 15px auto;
+            width: 450px;
+            height: 450px;
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .cell.x { color: #ef4444; }
+        .cell.o { color: #3b82f6; }
+
+        .stats-box {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 8px 12px;
+            margin: 6px 0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .shop-item button {
+            width: auto;
+            padding: 6px 12px;
+            margin: 0;
+        }
+
+        /* Custom Modal Box for replacing native alerts */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            width: 320px;
+            text-align: center;
+            border: 1px solid var(--primary-color);
+        }
+    </style>
+</head>
+<body class="theme-default">
+
+    <div class="container">
+        <!-- 1. PHẦN ĐĂNG NHẬP / ĐĂNG KÝ -->
+        <div id="auth-screen">
+            <h2>Đăng Nhập / Đăng Ký Caro</h2>
+            <input type="text" id="username" placeholder="Nhập tên tài khoản...">
+            <input type="password" id="password" placeholder="Nhập mật khẩu...">
+            <button onclick="handleAuth()">Vào Game</button>
+        </div>
+
+        <!-- 2. MENU CHÍNH -->
+        <div id="menu-screen" class="hidden">
+            <h2>Xin chào, <span id="display-user"></span></h2>
+            
+            <div class="stats-box">
+                <div>🔥 Streak: <span id="stat-streak">1</span> ngày</div>
+                <div>🏆 Thắng: <span id="stat-wins">0</span></div>
+                <div>🪙 Token: <span id="stat-tokens">100</span></div>
+            </div>
+
+            <button onclick="showScreen('mode-screen')">Chơi Ngay</button>
+            <button onclick="showScreen('shop-screen')">Cửa Hàng Giao Diện</button>
+        </div>
+
+        <!-- 3. CHỌN CHẾ ĐỘ CHƠI -->
+        <div id="mode-screen" class="hidden">
+            <h3>Chọn Chế Độ Chơi</h3>
+            <button onclick="startAIGameSetup()">1. Chơi Với Máy (AI)</button>
+            <button onclick="startPracticeGame()">2. Luyện Tập (Máy vs Máy)</button>
+            <button onclick="showScreen('online-screen')">3. Đấu Online (PeerJS)</button>
+            <button onclick="showScreen('menu-screen')">Quay lại</button>
+        </div>
+
+        <!-- 3.1 CẤP ĐỘ MÁY -->
+        <div id="ai-difficulty-screen" class="hidden">
+            <h3>Chọn Cấp Độ Máy</h3>
+            <button onclick="startAIGame('easy')">Dễ</button>
+            <button onclick="startAIGame('medium')">Trung Bình</button>
+            <button onclick="startAIGame('hard')">Khó</button>
+            <button onclick="showScreen('mode-screen')">Quay lại</button>
+        </div>
+
+        <!-- 3.2 ĐẤU ONLINE -->
+        <div id="online-screen" class="hidden">
+            <h3>Đấu Caro Online</h3>
+            <button onclick="createOnlineRoom()">Tạo Phòng Mới</button>
+            <div id="room-info" class="hidden">
+                <p>ID Phòng của bạn: <span id="room-id-display" style="font-weight:bold; color:#38bdf8;"></span></p>
+                <button onclick="copyRoomId()">Sao Chép ID Phòng</button>
+            </div>
+            <hr style="border-color: #475569;">
+            <input type="text" id="input-room-id" placeholder="Nhập ID phòng bạn bè...">
+            <button onclick="joinOnlineRoom()">Vào Phòng</button>
+            <button onclick="showScreen('mode-screen')">Quay lại</button>
+        </div>
+
+        <!-- 4. MÀN HÌNH GAME CARO 15x15 -->
+        <div id="game-screen" class="hidden">
+            <h3 id="game-status">Lượt đi: X</h3>
+            <div class="board" id="caro-board"></div>
+            <button onclick="quitGame()">Thoát Về Menu</button>
+        </div>
+
+        <!-- 5. CỬA HÀNG GIAO DIỆN -->
+        <div id="shop-screen" class="hidden">
+            <h3>Cửa Hàng Giao Diện</h3>
+            <div class="shop-item">
+                <span>Mặc Định</span>
+                <button onclick="setTheme('default')">Dùng</button>
+            </div>
+            <div class="shop-item">
+                <span>Cyberpunk Neon (50 Tokens)</span>
+                <button onclick="buyTheme('theme-cyberpunk', 50)">Mua</button>
+            </div>
+            <div class="shop-item">
+                <span>Gỗ Cổ Điển (80 Tokens)</span>
+                <button onclick="buyTheme('theme-wood', 80)">Mua</button>
+            </div>
+            <div class="shop-item">
+                <span>Tím Mộng Mơ (100 Tokens)</span>
+                <button onclick="buyTheme('theme-neon', 100)">Mua</button>
+            </div>
+            <button onclick="showScreen('menu-screen')">Quay lại</button>
+        </div>
+    </div>
+
+    <!-- Custom Modal Container -->
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="modal-message"></p>
+            <button onclick="closeModal()">Đồng Ý</button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = "";
+        let streak = 1, wins = 0, tokens = 100;
+        let board = Array(15).fill(null).map(() => Array(15).fill(null));
+        let currentTurn = 'X';
+        let mySymbol = 'X';
+        let gameMode = ''; 
+        let aiDifficulty = 'easy';
+        let gameActive = false;
+        
+        let peer = null;
+        let conn = null;
+        let myPeerId = '';
+
+        function showCustomModal(msg, callback) {
+            document.getElementById('modal-message').innerText = msg;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            window.modalCallback = callback;
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            if(window.modalCallback) {
+                window.modalCallback();
+                window.modalCallback = null;
+            }
+        }
+
+        function showScreen(screenId) {
+            ['auth-screen', 'menu-screen', 'mode-screen', 'ai-difficulty-screen', 'online-screen', 'game-screen', 'shop-screen'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function handleAuth() {
+            const user = document.getElementById('username').value.trim();
+            if(!user) { showCustomModal('Vui lòng nhập tên tài khoản!'); return; }
+            currentUser = user;
+            
+            // Load saved local user data if exists
+            const saved = localStorage.getItem('caro_user_' + currentUser);
+            if(saved) {
+                const data = JSON.parse(saved);
+                streak = data.streak || 1;
+                wins = data.wins || 0;
+                tokens = data.tokens || 100;
+            }
+
+            updateStatsUI();
+            document.getElementById('display-user').innerText = currentUser;
+            showScreen('menu-screen');
+        }
+
+        function saveUserData() {
+            if(!currentUser) return;
+            localStorage.setItem('caro_user_' + currentUser, JSON.stringify({ streak, wins, tokens }));
+        }
+
+        function updateStatsUI() {
+            document.getElementById('stat-streak').innerText = streak;
+            document.getElementById('stat-wins').innerText = wins;
+            document.getElementById('stat-tokens').innerText = tokens;
+        }
+
+        function startAIGameSetup() {
+            showScreen('ai-difficulty-screen');
+        }
+
+        function startAIGame(level) {
+            gameMode = 'ai';
+            aiDifficulty = level;
+            initGame();
+        }
+
+        function startPracticeGame() {
+            gameMode = 'practice';
+            initGame();
+            runPracticeLoop();
+        }
+
+        function initGame() {
+            showScreen('game-screen');
+            board = Array(15).fill(null).map(() => Array(15).fill(null));
+            currentTurn = 'X';
+            gameActive = true;
+            renderBoard();
+            document.getElementById('game-status').innerText = "Lượt đi: X";
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('caro-board');
+            boardEl.innerHTML = '';
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    const cell = document.createElement('div');
+                    let val = board[r][c];
+                    cell.className = `cell ${val ? val.toLowerCase() : ''}`;
+                    cell.innerText = val || '';
+                    cell.onclick = () => handleCellClick(r, c);
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if(!gameActive || board[r][c] !== null) return;
+
+            if(gameMode === 'online') {
+                if(currentTurn !== mySymbol) return;
+                makeMove(r, c, mySymbol);
+                conn.send({ row: r, col: c, symbol: mySymbol });
+                
+                if(checkWin(r, c, mySymbol)) {
+                    endGame(mySymbol);
+                } else {
+                    currentTurn = (mySymbol === 'X') ? 'O' : 'X';
+                    document.getElementById('game-status').innerText = `Lượt đi: ${currentTurn} (${currentTurn === mySymbol ? 'Lượt bạn' : 'Đối thủ'})`;
+                }
+            } else if(gameMode === 'ai') {
+                if(currentTurn !== 'X') return;
+                makeMove(r, c, 'X');
+                if(checkWin(r, c, 'X')) { endGame('X'); return; }
+                
+                // Check draw
+                if(isBoardFull()) { showCustomModal("Ván đấu hòa!", () => quitGame()); return; }
+
+                currentTurn = 'O';
+                document.getElementById('game-status').innerText = "Máy đang nghĩ...";
+                setTimeout(aiMove, 300);
+            }
+        }
+
+        function makeMove(r, c, symbol) {
+            board[r][c] = symbol;
+            renderBoard();
+        }
+
+        function isBoardFull() {
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    if(!board[r][c]) return false;
+                }
+            }
+            return true;
+        }
+
+        function aiMove() {
+            if(!gameActive) return;
+            let emptyCells = [];
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    if(!board[r][c]) emptyCells.push({r, c});
+                }
+            }
+            if(emptyCells.length === 0) return;
+
+            // AI Logic based on difficulty
+            let chosen = null;
+            if(aiDifficulty === 'easy') {
+                chosen = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            } else {
+                // Medium/Hard: Try to find winning move or blocking move
+                chosen = findBestAIMove(emptyCells);
+            }
+
+            makeMove(chosen.r, chosen.c, 'O');
+            
+            if(checkWin(chosen.r, chosen.c, 'O')) {
+                endGame('O');
+            } else if(isBoardFull()) {
+                showCustomModal("Ván đấu hòa!", () => quitGame());
+            } else {
+                currentTurn = 'X';
+                document.getElementById('game-status').innerText = "Lượt đi: X (Lượt bạn)";
+            }
+        }
+
+        function findBestAIMove(emptyCells) {
+            // Check if AI can win in 1 move
+            for(let cell of emptyCells) {
+                board[cell.r][cell.c] = 'O';
+                if(checkWin(cell.r, cell.c, 'O')) {
+                    board[cell.r][cell.c] = null;
+                    return cell;
+                }
+                board[cell.r][cell.c] = null;
+            }
+            // Check if player can win in 1 move, block it
+            for(let cell of emptyCells) {
+                board[cell.r][cell.c] = 'X';
+                if(checkWin(cell.r, cell.c, 'X')) {
+                    board[cell.r][cell.c] = null;
+                    return cell;
+                }
+                board[cell.r][cell.c] = null;
+            }
+            // Default random choice
+            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        }
+
+        function runPracticeLoop() {
+            if(gameMode !== 'practice' || !gameActive) return;
+            let emptyCells = [];
+            for(let r=0; r<15; r++) {
+                for(let c=0; c<15; c++) {
+                    if(!board[r][c]) emptyCells.push({r, c});
+                }
+            }
+            if(emptyCells.length === 0) { showCustomModal("Ván luyện tập hòa!", () => quitGame()); return; }
+            let chosen = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            makeMove(chosen.r, chosen.c, currentTurn);
+            
+            if(checkWin(chosen.r, chosen.c, currentTurn)) {
+                showCustomModal(`Máy ${currentTurn} chiến thắng!`, () => quitGame());
+                return;
+            }
+            currentTurn = currentTurn === 'X' ? 'O' : 'X';
+            setTimeout(runPracticeLoop, 400);
+        }
+
+        function checkWin(r, c, symbol) {
+            const directions = [
+                {dr: 0, dc: 1},  // Ngang
+                {dr: 1, dc: 0},  // Dọc
+                {dr: 1, dc: 1},  // Xiên chính
+                {dr: 1, dc: -1}  // Xiên phụ
+            ];
+
+            for(let d of directions) {
+                let count = 1;
+                count += countConsecutive(r, c, d.dr, d.dc, symbol);
+                count += countConsecutive(r, c, -d.dr, -d.dc, symbol);
+                if(count >= 5) return true;
+            }
+            return false;
+        }
+
+        function countConsecutive(r, c, dr, dc, symbol) {
+            let count = 0;
+            let rr = r + dr, cc = c + dc;
+            while(rr >= 0 && rr < 15 && cc >= 0 && cc < 15 && board[rr][cc] === symbol) {
+                count++;
+                rr += dr;
+                cc += dc;
+            }
+            return count;
+        }
+
+        function endGame(winner) {
+            gameActive = false;
+            if(gameMode === 'ai') {
+                if(winner === 'X') {
+                    wins++;
+                    tokens += 20;
+                    showCustomModal("🎉 Bạn đã chiến thắng và nhận được 20 Token!", () => {
+                        updateStatsUI();
+                        saveUserData();
+                        showScreen('menu-screen');
+                    });
+                } else {
+                    showCustomModal("😢 Máy đã chiến thắng!", () => {
+                        showScreen('menu-screen');
+                    });
+                }
+            } else if(gameMode === 'online') {
+                if(winner === mySymbol) {
+                    wins++;
+                    tokens += 30;
+                    showCustomModal("🎉 Chúc mừng bạn đã thắng trận đấu online (+30 Token)!", () => {
+                        updateStatsUI();
+                        saveUserData();
+                        showScreen('menu-screen');
+                    });
+                } else {
+                    showCustomModal("😢 Bạn đã thua trong trận đấu online!", () => {
+                        showScreen('menu-screen');
+                    });
+                }
+            }
+        }
+
+        function quitGame() {
+            gameActive = false;
+            if(conn) { conn.close(); conn = null; }
+            if(peer) { peer.destroy(); peer = null; }
+            showScreen('menu-screen');
+        }
+
+        // --- PEERJS ONLINE LOGIC ---
+        function initPeer(onOpenCb) {
+            if(peer) peer.destroy();
+            peer = new Peer();
+            peer.on('open', (id) => {
+                myPeerId = id;
+                if(onOpenCb) onOpenCb(id);
+            });
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnection();
+            });
+        }
+
+        function createOnlineRoom() {
+            gameMode = 'online';
+            mySymbol = 'X';
+            initPeer((id) => {
+                document.getElementById('room-id-display').innerText = id;
+                document.getElementById('room-info').classList.remove('hidden');
+            });
+        }
+
+        function copyRoomId() {
+            navigator.clipboard.writeText(myPeerId);
+            showCustomModal("Đã sao chép ID phòng vào bộ nhớ tạm!");
+        }
+
+        function joinOnlineRoom() {
+            const roomId = document.getElementById('input-room-id').value.trim();
+            if(!roomId) { showCustomModal("Vui lòng nhập ID phòng!"); return; }
+            gameMode = 'online';
+            mySymbol = 'O';
+
+            initPeer(() => {
+                conn = peer.connect(roomId);
+                setupConnection();
+            });
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                initGame();
+                document.getElementById('game-status').innerText = `Đã kết nối! Bạn cầm quân: ${mySymbol} ${mySymbol === 'X' ? '(Lượt bạn)' : '(Đợi đối thủ)'}`;
+            });
+            conn.on('data', (data) => {
+                makeMove(data.row, data.col, data.symbol);
+                if(checkWin(data.row, data.col, data.symbol)) {
+                    endGame(data.symbol);
+                } else {
+                    currentTurn = mySymbol;
+                    document.getElementById('game-status').innerText = `Lượt đi: ${currentTurn} (Lượt bạn)`;
+                }
+            });
+            conn.on('close', () => {
+                showCustomModal("Đối thủ đã ngắt kết nối!", () => quitGame());
+            });
+        }
+
+        // --- SHOP & THEME LOGIC ---
+        function setTheme(themeName) {
+            document.body.className = themeName === 'default' ? '' : themeName;
+            showCustomModal("Đã đổi giao diện thành công!");
+        }
+
+        function buyTheme(themeName, cost) {
+            if(tokens >= cost) {
+                tokens -= cost;
+                updateStatsUI();
+                saveUserData();
+                setTheme(themeName);
+            } else {
+                showCustomModal("Bạn không đủ Token để mua giao diện này!");
+            }
+        }
+    </script>
+</body>
+</html>
